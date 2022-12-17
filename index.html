@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <title>Information Visualization - State/ UTs wise Growth Rate</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC"
+      crossorigin="anonymous"
+    />
+
+    <style>
+      #canvas {
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
+      }
+      #heading {
+        margin-top: 10px;
+        text-align: center;
+        font-family: "Helvetica";
+        color: teal;
+      }
+      div.tooltip {
+        position: absolute;
+        text-align: center;
+        width: 100px;
+        height: 30px;
+        padding: 2px;
+        font: 12px sans-serif;
+        background: #3f0713;
+        border-style: solid;
+        border-radius: 5px;
+        color: white;
+        border-width: 0.5px;
+        border-color: black;
+        pointer-events: none;
+      }
+
+      #canvas {
+        margin-left: auto;
+        margin-right: auto;
+        margin-bottom: 50px;
+        display: block;
+      }
+
+      #dropdown {
+        width: 250px;
+        margin: 25px;
+      }
+    </style>
+  </head>
+  <body style="background-color: azure">
+    <h1 id="heading">
+      <b>
+        States / Union Territories wise Growth Rate - GSDP % (Constant Prices)
+        <br />
+        (1997-98 to 2013-14)
+      </b>
+    </h1>
+
+    <center>
+      <select
+        name="dropdown"
+        class="form-select"
+        id="dropdown"
+        onChange="func(this.value);"
+      ></select>
+    </center>
+
+    <div class="tooltip" style="opacity: 0"></div>
+
+    <div id="svg">
+      <svg
+        id="canvas"
+        width="900"
+        height="650"
+        style="border: solid 1px black; background-color: white"
+      >
+        <g
+          id="chart"
+          width="800"
+          height="500"
+          style="transform: translate(50px, 50px)"
+        ></g>
+        <g
+          id="legend"
+          width="800"
+          height="100"
+          style="transform: translate(50px, 550px)"
+        ></g>
+      </svg>
+    </div>
+
+    <script>
+      let highlight = "All India";
+
+      let svgHTML =
+        "<svg \
+          id='canvas' \
+          width='900' \
+          height='650' \
+          style='border: solid 1px black; background-color: white' \
+        > \
+          <g \
+            id='chart' \
+            width='800' \
+            height='500' \
+            style='transform: translate(50px, 50px)' \
+          ></g> \
+          <g \
+            id='legend' \
+            width='800' \
+            height='100' \
+            style='transform: translate(50px, 550px)' \
+          ></g> \
+        </svg>";
+
+      function func(state) {
+        highlight = state;
+        d3.select("svg").remove();
+        d3.select("#svg").html(svgHTML);
+        d3.csv(
+          "Growth_Rate_GSDP_Constant_Prices_1997-98_2013-14.csv",
+          visualize
+        );
+      }
+
+      function visualize(data) {
+        let obj = data.filter((d) => d["States/UTs"] == highlight)[0];
+
+        let filteredData = [];
+        let years = [];
+        let year = 1996;
+
+        for (var prop in obj) {
+          if (obj.hasOwnProperty(prop)) {
+            if (obj[prop] != "NA") {
+              filteredData.push(+obj[prop]);
+              years.push(year);
+            }
+            year++;
+          }
+        }
+        filteredData.shift();
+        years.shift();
+        let maxi = Math.max(...filteredData);
+        let mini = Math.min(...filteredData);
+
+        filteredData = filteredData.map((d, index) => ({
+          year: years[index],
+          value: d,
+        }));
+
+        let xScale = d3.scaleLinear().domain([1997, 2014]).range([0, 800]);
+        let xAxis = d3.axisBottom(xScale).ticks(17).tickFormat(d3.format("d"));
+        let xLine = d3
+          .select("#chart")
+          .append("g")
+          .call(xAxis)
+          .attr("transform", "translate(0,500)");
+
+        d3.select("#canvas")
+          .append("text")
+          .text("Year")
+          .attr("y", 590)
+          .attr("x", 450);
+
+        let yScale = d3
+          .scaleLinear()
+          .domain([mini - 1, maxi + 1])
+          .range([500, 0]);
+        let yAxis = d3.axisLeft(yScale);
+        let yline = d3
+          .select("#chart")
+          .append("g")
+          .call(yAxis)
+          .attr("class", "yAxis");
+
+        d3.select("#canvas")
+          .append("text")
+          .text("GDP Growth (%)")
+          .attr("transform", "translate(20,350) rotate(270)");
+
+        let lineGenerator = d3
+          .line()
+          .x((d) => xScale(d.year))
+          .y((d) => yScale(d.value));
+
+        d3.select("#chart")
+          .append("path")
+          .datum(filteredData)
+          .attr("class", "lines")
+          .attr("d", lineGenerator)
+          .style("fill", "none")
+          .style("stroke", "#003f5c")
+          .style("stroke-width", "1.5px");
+
+        var tooltip = d3.select(".tooltip");
+        var timeFormat = d3.timeFormat("%Y");
+
+        var mouseover = function (d) {
+          d3.select(this).style("fill", "white").style("stroke", "black");
+          tooltip.transition().duration(200).style("opacity", 1);
+          tooltip
+            .html("Year: " + d.year + "<br/>" + "Value: " + d.value + "%")
+            .style("left", d3.event.pageX + "px")
+            .style("top", d3.event.pageY - 36 + "px");
+        };
+
+        var mouseleave = function (d) {
+          tooltip.transition().duration(500).style("opacity", 0);
+          d3.select(this).style("fill", "teal").style("stroke", "none");
+        };
+
+        // Dots
+        d3.select("#chart")
+          .append("g")
+          .selectAll("dots")
+          .data(filteredData)
+          .enter()
+          .append("circle")
+          .attr("cx", (d) => xScale(d.year))
+          .attr("cy", (d) => yScale(d.value))
+          .attr("r", 3)
+          .attr("fill", "#003f5c")
+          .on("mouseover", mouseover)
+          .on("mouseleave", mouseleave);
+      }
+
+      // Populating options on initial load
+      d3.csv("Growth_Rate_GSDP_Constant_Prices_1997-98_2013-14.csv", options);
+
+      function options(data) {
+        let html = "";
+
+        data.forEach(function (item, idx) {
+          html += `<option value="${item["States/UTs"]}" class="dropdown-item">${item["States/UTs"]}</option>`;
+        });
+
+        d3.select("#dropdown").html(html);
+
+        func(data[0]["States/UTs"]);
+      }
+    </script>
+  </body>
+</html>
